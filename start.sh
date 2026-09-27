@@ -1,21 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Lance WhatsApp Transcriber sur http://$WT_HOST:$WT_PORT
+set -euo pipefail
 
-# WhatsApp Audio Transcriber Pro Launcher Script
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
-echo "=========================================================="
-echo " 🎙️  WhatsApp Audio Transcriber Pro - Whisper AI"
-echo "=========================================================="
+HOST="${WT_HOST:-127.0.0.1}"
+PORT="${WT_PORT:-8765}"
 
-if [ ! -d "$DIR/venv" ]; then
-    echo "⚙️  Création de l'environnement virtuel Python..."
-    python3 -m venv "$DIR/venv"
-    "$DIR/venv/bin/pip" install fastapi uvicorn python-multipart openai-whisper soundfile pydub
+if ! command -v ffmpeg >/dev/null; then
+    echo "ffmpeg est introuvable. Installe-le (ex. : sudo apt install ffmpeg)." >&2
+    exit 1
 fi
 
-echo "🚀 Démarrage du serveur web sur http://localhost:8765 ..."
-echo "💡 Appuyez sur CTRL+C pour arrêter le serveur."
-echo ""
+if [ ! -x venv/bin/python ]; then
+    echo "Création de l'environnement virtuel..."
+    python3 -m venv venv
+    venv/bin/pip install --upgrade pip
+    venv/bin/pip install -r requirements.txt
+fi
 
-"$DIR/venv/bin/python" -m uvicorn app.main:app --host 0.0.0.0 --port 8765 --reload
+echo "WhatsApp Transcriber : http://$HOST:$PORT (CTRL+C pour arrêter)"
+exec venv/bin/python -m uvicorn app.main:app --host "$HOST" --port "$PORT"

@@ -14,3 +14,4 @@ DEFAULT_MODEL = os.getenv("WT_MODEL", "small")
 
 for d in (UPLOADS_DIR, CONVERTED_DIR):
     d.mkdir(parents=True, exist_ok=True)
+CPU_THREADS = int(os.getenv("WT_THREADS", os.cpu_count() or 4))
