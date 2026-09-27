@@ -1,382 +1,84 @@
 <!DOCTYPE html>
-<html lang="fr" class="dark">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Audio Transcriber Pro - Whisper AI</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#eep2ff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            900: '#1e1b4b',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-    </style>
+    <title>WhatsApp Transcriber</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+<body>
+    <main>
+        <header>
+            <h1>WhatsApp Transcriber</h1>
+            <p class="muted">Notes vocales → texte, en local avec Whisper.</p>
+        </header>
 
-    <!-- Header Banner -->
-    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                    <i data-lucide="mic" class="w-5 h-5 text-white"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-white flex items-center gap-2">
-                        WhatsApp Transcriber <span class="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono">Pro v1.0</span>
-                    </h1>
-                    <p class="text-xs text-slate-400">Convertisseur & Transcription Locale Whisper AI</p>
-                </div>
-            </div>
+        <section class="upload">
+            <label id="dropzone" class="dropzone">
+                <input type="file" id="fileInput" multiple accept="audio/*,.ogg,.opus,.wav,.mp3,.m4a">
+                <strong>Dépose tes notes vocales ici</strong>
+                <span class="muted">ou clique pour choisir · .ogg .opus .mp3 .m4a .wav</span>
+            </label>
 
-            <!-- Global Controls -->
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
-                    <i data-lucide="cpu" class="w-4 h-4 text-emerald-400"></i>
-                    <span class="text-slate-300 font-medium">Modèle :</span>
-                    <select id="modelSelect" class="bg-transparent text-white font-semibold outline-none cursor-pointer">
-                        <option value="tiny">Whisper Tiny (Ultra-rapide)</option>
-                        <option value="base">Whisper Base (Rapide)</option>
-                        <option value="small" selected>Whisper Small (Recommandé)</option>
-                        <option value="medium">Whisper Medium (Haute Précision)</option>
+            <ul id="queue" class="queue"></ul>
+
+            <div class="controls">
+                <label>
+                    Modèle
+                    <select id="modelSelect">
+                        <option value="tiny">tiny (très rapide)</option>
+                        <option value="base">base</option>
+                        <option value="small" selected>small (conseillé)</option>
+                        <option value="medium">medium (plus précis, lent)</option>
                     </select>
-                </div>
+                </label>
+                <label>
+                    Langue
+                    <select id="languageSelect">
+                        <option value="fr" selected>Français</option>
+                        <option value="en">Anglais</option>
+                        <option value="auto">Détection auto</option>
+                    </select>
+                </label>
+                <button id="transcribeBtn" class="primary" disabled>Transcrire</button>
             </div>
-        </div>
-    </header>
+        </section>
 
-    <!-- Main Container -->
-    <main class="flex-1 max-w-6xl w-full mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        <!-- Left Column: Upload Zone -->
-        <div class="lg:col-span-5 space-y-6">
-            <div class="glass p-6 rounded-2xl shadow-xl">
-                <h2 class="text-md font-semibold text-white mb-4 flex items-center gap-2">
-                    <i data-lucide="upload-cloud" class="w-5 h-5 text-indigo-400"></i>
-                    Importer des fichiers WhatsApp
-                </h2>
-
-                <!-- Dropzone -->
-                <div id="dropzone" class="border-2 border-dashed border-indigo-500/30 hover:border-indigo-500/80 bg-slate-900/40 rounded-xl p-8 text-center cursor-pointer transition-all duration-300 group">
-                    <input type="file" id="fileInput" multiple accept="audio/*,.ogg,.opus,.wav,.mp3,.m4a" class="hidden">
-                    <div class="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-3 text-indigo-400 group-hover:scale-110 transition-transform">
-                        <i data-lucide="file-audio" class="w-6 h-6"></i>
-                    </div>
-                    <p class="text-sm font-medium text-slate-200">Glissez vos audios WhatsApp ici</p>
-                    <p class="text-xs text-slate-500 mt-1">Formats supportés : .ogg, .opus, .mp3, .wav, .m4a</p>
-                    <button type="button" class="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 rounded-lg border border-slate-700 transition">
-                        Parcourir les fichiers
-                    </button>
-                </div>
-
-                <!-- Selected Files List -->
-                <div id="fileQueue" class="mt-4 space-y-2 hidden">
-                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Fichiers sélectionnés :</p>
-                    <div id="fileQueueItems" class="space-y-1.5 max-h-40 overflow-y-auto pr-1"></div>
-                </div>
-
-                <!-- Submit Action -->
-                <button id="transcribeBtn" disabled class="mt-6 w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition">
-                    <i data-lucide="zap" class="w-4 h-4"></i>
-                    Lancer la Transcription
-                </button>
+        <section>
+            <div class="history-head">
+                <h2>Historique</h2>
+                <input type="search" id="searchInput" placeholder="Rechercher…">
             </div>
-
-            <!-- Tips Box -->
-            <div class="bg-indigo-950/30 border border-indigo-500/20 p-4 rounded-xl text-xs text-indigo-200 space-y-2">
-                <p class="font-semibold flex items-center gap-1.5 text-indigo-300">
-                    <i data-lucide="info" class="w-4 h-4"></i> Astuce WhatsApp Web / Desktop :
-                </p>
-                <p class="text-indigo-300/80 leading-relaxed">
-                    Faites simplement glisser les notes vocales directement depuis votre dossier de téléchargement ou WhatsApp vers la zone de dépôt.
-                </p>
-            </div>
-        </div>
-
-        <!-- Right Column: Results & History -->
-        <div class="lg:col-span-7 space-y-6">
-            
-            <!-- Loading Indicator -->
-            <div id="loadingCard" class="glass p-8 rounded-2xl text-center hidden space-y-4">
-                <div class="inline-block relative w-12 h-12">
-                    <div class="w-12 h-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-semibold text-white">Transcription en cours via Whisper AI...</h3>
-                    <p class="text-xs text-slate-400 mt-1">Le modèle analyse l'audio localement. Veuillez patienter.</p>
-                </div>
-            </div>
-
-            <!-- Filter & Search Bar -->
-            <div class="flex items-center justify-between gap-4">
-                <h2 class="text-md font-semibold text-white flex items-center gap-2">
-                    <i data-lucide="history" class="w-5 h-5 text-indigo-400"></i>
-                    Historique des Transcriptions
-                </h2>
-                <div class="relative">
-                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-500"></i>
-                    <input type="text" id="searchInput" placeholder="Rechercher..." class="bg-slate-900 border border-slate-800 text-xs text-slate-200 pl-9 pr-3 py-2 rounded-lg outline-none focus:border-indigo-500 w-48 transition">
-                </div>
-            </div>
-
-            <!-- Transcriptions List Container -->
-            <div id="resultsList" class="space-y-4">
-                <!-- Dynamic Items Inserted Here -->
-            </div>
-
-            <!-- Empty State -->
-            <div id="emptyState" class="glass p-12 rounded-2xl text-center space-y-3">
-                <div class="w-12 h-12 bg-slate-800/80 rounded-full flex items-center justify-center mx-auto text-slate-500">
-                    <i data-lucide="file-text" class="w-6 h-6"></i>
-                </div>
-                <p class="text-sm font-medium text-slate-300">Aucune transcription pour le moment</p>
-                <p class="text-xs text-slate-500">Importez une note vocale WhatsApp à gauche pour commencer.</p>
-            </div>
-
-        </div>
+            <p id="emptyState" class="muted empty">Aucune transcription pour l'instant.</p>
+            <ol id="resultsList" class="results"></ol>
+        </section>
     </main>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-6 right-6 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold translate-y-20 opacity-0 transition-all duration-300 z-50">
-        <i data-lucide="check-circle" class="w-4 h-4"></i>
-        <span id="toastMsg">Texte copié dans le presse-papier !</span>
-    </div>
+    <div id="toast" class="toast" role="status"></div>
 
-    <!-- JS Logic -->
-    <script>
-        lucide.createIcons();
-
-        const dropzone = document.getElementById('dropzone');
-        const fileInput = document.getElementById('fileInput');
-        const fileQueue = document.getElementById('fileQueue');
-        const fileQueueItems = document.getElementById('fileQueueItems');
-        const transcribeBtn = document.getElementById('transcribeBtn');
-        const loadingCard = document.getElementById('loadingCard');
-        const resultsList = document.getElementById('resultsList');
-        const emptyState = document.getElementById('emptyState');
-        const modelSelect = document.getElementById('modelSelect');
-        const searchInput = document.getElementById('searchInput');
-
-        // Tout ce qui vient d'un fichier ou de l'historique doit passer par ici
-        // avant d'être injecté dans innerHTML (nom de fichier, texte transcrit...).
-        function escapeHtml(value) {
-            return String(value ?? '').replace(/[&<>"']/g, c => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            }[c]));
-        }
-
-        let selectedFiles = [];
-        let historyData = [];
-
-        // File Select Handlers
-        dropzone.addEventListener('click', () => fileInput.click());
-
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(Array.from(e.target.files));
-        });
-
-        dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropzone.classList.add('border-indigo-500', 'bg-indigo-950/20');
-        });
-
-        dropzone.addEventListener('dragleave', () => {
-            dropzone.classList.remove('border-indigo-500', 'bg-indigo-950/20');
-        });
-
-        dropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropzone.classList.remove('border-indigo-500', 'bg-indigo-950/20');
-            handleFiles(Array.from(e.dataTransfer.files));
-        });
-
-        function handleFiles(files) {
-            selectedFiles = files.filter(f => f.type.startsWith('audio/') || f.name.match(/\.(ogg|opus|wav|mp3|m4a|aac)$/i));
-            if (selectedFiles.length > 0) {
-                fileQueue.classList.remove('hidden');
-                transcribeBtn.disabled = false;
-                renderQueue();
-            }
-        }
-
-        function renderQueue() {
-            fileQueueItems.innerHTML = selectedFiles.map((f, idx) => `
-                <div class="flex items-center justify-between bg-slate-900/80 px-3 py-2 rounded-lg text-xs border border-slate-800">
-                    <span class="truncate font-medium text-slate-200 max-w-[200px]">${escapeHtml(f.name)}</span>
-                    <span class="text-slate-500 font-mono">${(f.size / 1024).toFixed(1)} KB</span>
+    <template id="itemTemplate">
+        <li class="item">
+            <div class="item-head">
+                <div>
+                    <h3 class="filename"></h3>
+                    <p class="meta muted"></p>
                 </div>
-            `).join('');
-        }
-
-        // Transcribe Submit
-        transcribeBtn.addEventListener('click', async () => {
-            if (selectedFiles.length === 0) return;
-
-            const formData = new FormData();
-            selectedFiles.forEach(f => formData.append('files', f));
-            formData.append('model_name', modelSelect.value);
-            formData.append('language', 'fr');
-
-            loadingCard.classList.remove('hidden');
-            transcribeBtn.disabled = true;
-
-            try {
-                const res = await fetch('/api/transcribe', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!res.ok) throw new Error('Erreur lors de la transcription');
-
-                const data = await res.json();
-                
-                // Clear queue
-                selectedFiles = [];
-                fileInput.value = '';
-                fileQueue.classList.add('hidden');
-                
-                await fetchHistory();
-
-                showToast('Transcription effectuée avec succès !');
-
-            } catch (err) {
-                alert('Erreur: ' + err.message);
-            } finally {
-                loadingCard.classList.add('hidden');
-            }
-        });
-
-        // Fetch & Render History
-        async function fetchHistory() {
-            try {
-                const res = await fetch('/api/history');
-                historyData = await res.json();
-                renderResults(historyData);
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        function renderResults(data) {
-            const query = searchInput.value.toLowerCase();
-            const filtered = data.filter(item => 
-                item.filename.toLowerCase().includes(query) || 
-                item.text.toLowerCase().includes(query)
-            );
-
-            if (filtered.length === 0) {
-                resultsList.innerHTML = '';
-                emptyState.classList.remove('hidden');
-                return;
-            }
-
-            emptyState.classList.add('hidden');
-
-            resultsList.innerHTML = filtered.map(item => `
-                <div class="glass p-5 rounded-2xl space-y-4 border border-slate-800 hover:border-slate-700 transition">
-                    
-                    <!-- Item Header -->
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                                <i data-lucide="file-audio" class="w-4 h-4 text-indigo-400"></i>
-                                ${escapeHtml(item.filename)}
-                            </h3>
-                            <div class="flex items-center gap-3 mt-1 text-[11px] text-slate-400 font-mono">
-                                <span>📅 ${escapeHtml(item.timestamp)}</span>
-                                <span>⚡ Whisper ${escapeHtml(item.model)} (${escapeHtml(item.duration_proc)}s)</span>
-                            </div>
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="flex items-center gap-1.5">
-                            <button data-action="copy" data-id="${escapeHtml(item.id)}" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition" title="Copier le texte">
-                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-                                Copier
-                            </button>
-                            <a href="/api/export/${encodeURIComponent(item.id)}?format=txt" download class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition" title="Télécharger .TXT">
-                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                            </a>
-                            <button data-action="delete" data-id="${escapeHtml(item.id)}" class="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs transition" title="Supprimer">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Audio Player -->
-                    <audio controls src="/api/audio/${encodeURIComponent(item.id)}" class="w-full h-8 rounded-lg outline-none bg-slate-900"></audio>
-
-                    <!-- Text Box -->
-                    <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-900 text-slate-200 text-xs leading-relaxed tracking-wide select-all" id="text-${escapeHtml(item.id)}">
-                        ${escapeHtml(item.text)}
-                    </div>
-
+                <div class="actions">
+                    <button data-action="copy">Copier</button>
+                    <a data-export="txt">.txt</a>
+                    <a data-export="md">.md</a>
+                    <button data-action="delete" class="danger">Supprimer</button>
                 </div>
-            `).join('');
+            </div>
+            <audio controls preload="none"></audio>
+            <p class="text"></p>
+            <details>
+                <summary>Horodatage</summary>
+                <ul class="segments"></ul>
+            </details>
+        </li>
+    </template>
 
-            lucide.createIcons();
-        }
-
-        // Copy Handler
-        function copyText(id) {
-            const el = document.getElementById(`text-${id}`);
-            if (el) {
-                navigator.clipboard.writeText(el.innerText);
-                showToast('Texte copié dans le presse-papier !');
-            }
-        }
-
-        // Delete Handler
-        async function deleteItem(id) {
-            if (!confirm('Supprimer cette transcription ?')) return;
-            await fetch(`/api/history/${id}`, { method: 'DELETE' });
-            fetchHistory();
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastMsg').innerText = msg;
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3000);
-        }
-
-        resultsList.addEventListener('click', (e) => {
-            const btn = e.target.closest('button[data-action]');
-            if (!btn) return;
-            if (btn.dataset.action === 'copy') copyText(btn.dataset.id);
-            if (btn.dataset.action === 'delete') deleteItem(btn.dataset.id);
-        });
-
-        searchInput.addEventListener('input', () => renderResults(historyData));
-
-        // Initial Load
-        fetchHistory();
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
