@@ -3,12 +3,12 @@ import time
 import json
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 from typing import List
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
-from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 
 from . import history, transcriber
@@ -17,13 +17,14 @@ from .config import CONVERTED_DIR, DEFAULT_MODEL, MODELS, STATIC_DIR, UPLOADS_DI
 
 app = FastAPI(title="WhatsApp Audio Transcriber", version="1.0.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+
+def _check_id(item_id: str) -> str:
+    """Les ids servent à construire des chemins de fichiers : on n'accepte que des UUID."""
+    try:
+        return str(uuid.UUID(item_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Item not found")
 
 
 def _process(file: UploadFile, model_name: str, language: str) -> dict:
@@ -97,6 +98,7 @@ async def get_history():
 
 @app.delete("/api/history/{item_id}")
 async def delete_item(item_id: str):
+    item_id = _check_id(item_id)
     history.remove(item_id)
     for d in (UPLOADS_DIR, CONVERTED_DIR):
         for f in d.glob(f"{item_id}*"):
@@ -106,6 +108,7 @@ async def delete_item(item_id: str):
 
 @app.get("/api/audio/{item_id}")
 async def get_audio(item_id: str):
+    item_id = _check_id(item_id)
     wav_path = CONVERTED_DIR / f"{item_id}.wav"
     if wav_path.exists():
         return FileResponse(wav_path, media_type="audio/wav")
@@ -114,6 +117,7 @@ async def get_audio(item_id: str):
 
 @app.get("/api/export/{item_id}")
 async def export_item(item_id: str, format: str = "txt"):
+    item_id = _check_id(item_id)
     item = history.get(item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -140,7 +144,8 @@ async def export_item(item_id: str, format: str = "txt"):
     return Response(
         content=content,
         media_type=media_type,
-        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+        # filename* (RFC 5987) : supporte accents et caractères spéciaux sans casser l'en-tête.
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
     )
 
 
