@@ -18,4 +18,4 @@ echo "🚀 Démarrage du serveur web sur http://localhost:8765 ..."
 echo "💡 Appuyez sur CTRL+C pour arrêter le serveur."
 echo ""
 
-"$DIR/venv/bin/python" -m uvicorn main:app --host 0.0.0.0 --port 8765 --reload
+"$DIR/venv/bin/python" -m uvicorn app.main:app --host 0.0.0.0 --port 8765 --reload
