@@ -8,6 +8,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from . import history, transcriber
 from .audio import AudioConversionError, to_wav
@@ -43,14 +44,16 @@ async def transcribe_audios(
         with open(raw_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        # FFmpeg et Whisper sont bloquants : on les sort de la boucle d'événements
+        # pour que le serveur reste disponible (historique, lecture audio...).
         try:
-            to_wav(raw_path, wav_path)
+            await run_in_threadpool(to_wav, raw_path, wav_path)
         except AudioConversionError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
         try:
             start = time.time()
-            res = transcriber.transcribe(str(wav_path), model_name, language)
+            res = await run_in_threadpool(transcriber.transcribe, str(wav_path), model_name, language)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Erreur lors de la transcription: {e}")
 
