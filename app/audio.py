@@ -16,4 +16,4 @@ def to_wav(src: Path, dst: Path) -> None:
             stderr=subprocess.DEVNULL,
         )
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        raise AudioConversionError(f"Erreur de conversion audio avec FFmpeg: {e}") from e
+        raise AudioConversionError(f"Erreur de conversion audio avec FFmpeg : {e}") from e

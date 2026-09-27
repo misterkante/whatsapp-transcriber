@@ -1,10 +1,9 @@
+import json
 import shutil
 import time
-import json
 import uuid
 from pathlib import Path
 from urllib.parse import quote
-from typing import List
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -15,8 +14,7 @@ from . import history, transcriber
 from .audio import AudioConversionError, to_wav
 from .config import CONVERTED_DIR, DEFAULT_MODEL, MODELS, STATIC_DIR, UPLOADS_DIR
 
-app = FastAPI(title="WhatsApp Audio Transcriber", version="1.0.0")
-
+app = FastAPI(title="WhatsApp Transcriber", version="1.1.0")
 
 
 def _check_id(item_id: str) -> str:
@@ -24,7 +22,7 @@ def _check_id(item_id: str) -> str:
     try:
         return str(uuid.UUID(item_id))
     except ValueError:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise HTTPException(status_code=404, detail="Transcription introuvable")
 
 
 def _process(file: UploadFile, model_name: str, language: str) -> dict:
@@ -63,7 +61,7 @@ def _process(file: UploadFile, model_name: str, language: str) -> dict:
 
 @app.post("/api/transcribe")
 async def transcribe_audios(
-    files: List[UploadFile] = File(...),
+    files: list[UploadFile] = File(...),
     model_name: str = Form(DEFAULT_MODEL),
     language: str = Form("fr"),
 ):
@@ -80,7 +78,7 @@ async def transcribe_audios(
             errors.append({"filename": file.filename, "error": str(e)})
             continue
         except Exception as e:
-            errors.append({"filename": file.filename, "error": f"Erreur lors de la transcription: {e}"})
+            errors.append({"filename": file.filename, "error": f"Erreur lors de la transcription : {e}"})
             continue
         # Sauvegarde fichier par fichier : un échec plus loin ne fait rien perdre.
         history.add(item)
@@ -112,7 +110,7 @@ async def get_audio(item_id: str):
     wav_path = CONVERTED_DIR / f"{item_id}.wav"
     if wav_path.exists():
         return FileResponse(wav_path, media_type="audio/wav")
-    raise HTTPException(status_code=404, detail="Audio file not found")
+    raise HTTPException(status_code=404, detail="Fichier audio introuvable")
 
 
 @app.get("/api/export/{item_id}")
@@ -120,7 +118,7 @@ async def export_item(item_id: str, format: str = "txt"):
     item_id = _check_id(item_id)
     item = history.get(item_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
+        raise HTTPException(status_code=404, detail="Transcription introuvable")
 
     if format == "json":
         content = json.dumps(item, ensure_ascii=False, indent=2)

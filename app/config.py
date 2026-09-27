@@ -11,7 +11,7 @@ HISTORY_FILE = DATA_DIR / "history.json"
 
 MODELS = ("tiny", "base", "small", "medium")
 DEFAULT_MODEL = os.getenv("WT_MODEL", "small")
+CPU_THREADS = int(os.getenv("WT_THREADS", os.cpu_count() or 4))
 
 for d in (UPLOADS_DIR, CONVERTED_DIR):
     d.mkdir(parents=True, exist_ok=True)
-CPU_THREADS = int(os.getenv("WT_THREADS", os.cpu_count() or 4))
