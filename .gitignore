@@ -1,0 +1,12 @@
+# Environnement Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Données utilisateur : notes vocales et transcriptions (privées)
+data/
+
+# Divers
+.env
+.DS_Store
