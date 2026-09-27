@@ -181,6 +181,14 @@
         const modelSelect = document.getElementById('modelSelect');
         const searchInput = document.getElementById('searchInput');
 
+        // Tout ce qui vient d'un fichier ou de l'historique doit passer par ici
+        // avant d'être injecté dans innerHTML (nom de fichier, texte transcrit...).
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
         let selectedFiles = [];
         let historyData = [];
 
@@ -218,7 +226,7 @@
         function renderQueue() {
             fileQueueItems.innerHTML = selectedFiles.map((f, idx) => `
                 <div class="flex items-center justify-between bg-slate-900/80 px-3 py-2 rounded-lg text-xs border border-slate-800">
-                    <span class="truncate font-medium text-slate-200 max-w-[200px]">${f.name}</span>
+                    <span class="truncate font-medium text-slate-200 max-w-[200px]">${escapeHtml(f.name)}</span>
                     <span class="text-slate-500 font-mono">${(f.size / 1024).toFixed(1)} KB</span>
                 </div>
             `).join('');
@@ -296,35 +304,35 @@
                         <div>
                             <h3 class="text-sm font-bold text-white flex items-center gap-2">
                                 <i data-lucide="file-audio" class="w-4 h-4 text-indigo-400"></i>
-                                ${item.filename}
+                                ${escapeHtml(item.filename)}
                             </h3>
                             <div class="flex items-center gap-3 mt-1 text-[11px] text-slate-400 font-mono">
-                                <span>📅 ${item.timestamp}</span>
-                                <span>⚡ Whisper ${item.model} (${item.duration_proc}s)</span>
+                                <span>📅 ${escapeHtml(item.timestamp)}</span>
+                                <span>⚡ Whisper ${escapeHtml(item.model)} (${escapeHtml(item.duration_proc)}s)</span>
                             </div>
                         </div>
 
                         <!-- Actions -->
                         <div class="flex items-center gap-1.5">
-                            <button onclick="copyText('${item.id}')" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition" title="Copier le texte">
+                            <button data-action="copy" data-id="${escapeHtml(item.id)}" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1.5 transition" title="Copier le texte">
                                 <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                                 Copier
                             </button>
-                            <a href="/api/export/${item.id}?format=txt" download class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition" title="Télécharger .TXT">
+                            <a href="/api/export/${encodeURIComponent(item.id)}?format=txt" download class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs transition" title="Télécharger .TXT">
                                 <i data-lucide="download" class="w-3.5 h-3.5"></i>
                             </a>
-                            <button onclick="deleteItem('${item.id}')" class="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs transition" title="Supprimer">
+                            <button data-action="delete" data-id="${escapeHtml(item.id)}" class="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs transition" title="Supprimer">
                                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                             </button>
                         </div>
                     </div>
 
                     <!-- Audio Player -->
-                    <audio controls src="${item.audio_url}" class="w-full h-8 rounded-lg outline-none bg-slate-900"></audio>
+                    <audio controls src="/api/audio/${encodeURIComponent(item.id)}" class="w-full h-8 rounded-lg outline-none bg-slate-900"></audio>
 
                     <!-- Text Box -->
-                    <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-900 text-slate-200 text-xs leading-relaxed tracking-wide select-all" id="text-${item.id}">
-                        ${item.text}
+                    <div class="bg-slate-950/80 p-4 rounded-xl border border-slate-900 text-slate-200 text-xs leading-relaxed tracking-wide select-all" id="text-${escapeHtml(item.id)}">
+                        ${escapeHtml(item.text)}
                     </div>
 
                 </div>
@@ -357,6 +365,13 @@
                 toast.classList.add('translate-y-20', 'opacity-0');
             }, 3000);
         }
+
+        resultsList.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            if (btn.dataset.action === 'copy') copyText(btn.dataset.id);
+            if (btn.dataset.action === 'delete') deleteItem(btn.dataset.id);
+        });
 
         searchInput.addEventListener('input', () => renderResults(historyData));
 
