@@ -2,6 +2,7 @@ import shutil
 import time
 import json
 import uuid
+from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -12,7 +13,7 @@ from starlette.concurrency import run_in_threadpool
 
 from . import history, transcriber
 from .audio import AudioConversionError, to_wav
-from .config import CONVERTED_DIR, DEFAULT_MODEL, STATIC_DIR, UPLOADS_DIR
+from .config import CONVERTED_DIR, DEFAULT_MODEL, MODELS, STATIC_DIR, UPLOADS_DIR
 
 app = FastAPI(title="WhatsApp Audio Transcriber", version="1.0.0")
 
@@ -25,54 +26,68 @@ app.add_middleware(
 )
 
 
+def _process(file: UploadFile, model_name: str, language: str) -> dict:
+    """Enregistre, convertit et transcrit un fichier. Nettoie derrière lui en cas d'échec."""
+    item_id = str(uuid.uuid4())
+    original_name = file.filename or "audio_whatsapp.ogg"
+    ext = Path(original_name).suffix.lower()
+    if not ext[1:].isalnum():
+        ext = ".ogg"
+    raw_path = UPLOADS_DIR / f"{item_id}{ext}"
+    wav_path = CONVERTED_DIR / f"{item_id}.wav"
+
+    try:
+        with open(raw_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        to_wav(raw_path, wav_path)
+        start = time.time()
+        res = transcriber.transcribe(str(wav_path), model_name, language)
+    except Exception:
+        raw_path.unlink(missing_ok=True)
+        wav_path.unlink(missing_ok=True)
+        raise
+
+    return {
+        "id": item_id,
+        "filename": original_name,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "model": model_name,
+        "language": res["language"],
+        "duration_proc": round(time.time() - start, 2),
+        "text": res["text"],
+        "segments": res["segments"],
+        "audio_url": f"/api/audio/{item_id}",
+    }
+
+
 @app.post("/api/transcribe")
 async def transcribe_audios(
     files: List[UploadFile] = File(...),
     model_name: str = Form(DEFAULT_MODEL),
     language: str = Form("fr"),
 ):
-    items = history.load()
-    results = []
+    if model_name not in MODELS:
+        raise HTTPException(status_code=400, detail=f"Modèle inconnu : {model_name}")
 
+    results, errors = [], []
     for file in files:
-        item_id = str(uuid.uuid4())
-        original_name = file.filename or "audio_whatsapp.ogg"
-        ext = "." + original_name.rsplit(".", 1)[-1].lower() if "." in original_name else ".ogg"
-        raw_path = UPLOADS_DIR / f"{item_id}{ext}"
-        wav_path = CONVERTED_DIR / f"{item_id}.wav"
-
-        with open(raw_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
         # FFmpeg et Whisper sont bloquants : on les sort de la boucle d'événements
         # pour que le serveur reste disponible (historique, lecture audio...).
         try:
-            await run_in_threadpool(to_wav, raw_path, wav_path)
+            item = await run_in_threadpool(_process, file, model_name, language)
         except AudioConversionError as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-        try:
-            start = time.time()
-            res = await run_in_threadpool(transcriber.transcribe, str(wav_path), model_name, language)
+            errors.append({"filename": file.filename, "error": str(e)})
+            continue
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Erreur lors de la transcription: {e}")
-
-        item = {
-            "id": item_id,
-            "filename": original_name,
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "model": model_name,
-            "language": res["language"],
-            "duration_proc": round(time.time() - start, 2),
-            "text": res["text"],
-            "segments": res["segments"],
-            "audio_url": f"/api/audio/{item_id}",
-        }
+            errors.append({"filename": file.filename, "error": f"Erreur lors de la transcription: {e}"})
+            continue
+        # Sauvegarde fichier par fichier : un échec plus loin ne fait rien perdre.
+        history.add(item)
         results.append(item)
-        items.insert(0, item)
 
-    history.save(items)
-    return {"status": "success", "count": len(results), "data": results}
+    if not results:
+        raise HTTPException(status_code=500, detail="; ".join(e["error"] for e in errors))
+    return {"status": "success", "count": len(results), "data": results, "errors": errors}
 
 
 @app.get("/api/history")
@@ -82,7 +97,7 @@ async def get_history():
 
 @app.delete("/api/history/{item_id}")
 async def delete_item(item_id: str):
-    history.save([i for i in history.load() if i["id"] != item_id])
+    history.remove(item_id)
     for d in (UPLOADS_DIR, CONVERTED_DIR):
         for f in d.glob(f"{item_id}*"):
             f.unlink(missing_ok=True)
